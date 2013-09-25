@@ -47,8 +47,9 @@ double pitch_offset;
 
 // Control Params
 
-double k = 30.0;
-double base = 100.0;
+double k = 15.0;
+double kD = 30;
+double kI = 10;
 
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
@@ -70,7 +71,15 @@ void dmpDataReady() {
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
+
+double lastE = 0;
+double intE = 0;
+int led_pin = 11;
+
 void setup() {
+  pinMode(led_pin, OUTPUT);
+  lastE= 0;
+  intE = 0; // just to make sure they're zeroed
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
@@ -120,8 +129,9 @@ void setup() {
 
     // configure LED for output
     pinMode(LED_PIN, OUTPUT);
-    
-    delay(1000);
+    digitalWrite(led_pin, HIGH);
+    delay(10000);
+    digitalWrite(led_pin, LOW);
     pitch_offset = ypr[1] * 180/M_PI;
 }
 
@@ -174,18 +184,14 @@ void loop() {
         double yaw = ypr[0] * 180/M_PI;
         double pitch = ypr[1] * 180/M_PI;
         double roll = ypr[2] * 180/M_PI;
-        double thres = 2;
-        double e = pitch-pitch_offset;  
-        if(abs(e) > thres){
-          if(e > 0){
-            md.setM1Speed(base+k*(pitch-pitch_offset));
-            md.setM2Speed(-base+k*(-e)); 
-          }
-          else{
-            md.setM1Speed(-base+k*(e));
-            md.setM2Speed(base+k*(-e));
-          }
-        }   
+        double e = pitch-pitch_offset;
+        double eDerv = e - lastE;
+        intE += e;
+          double v_e = k*e*abs(e) + kD*eDerv + kI*intE;
+
+            md.setM1Speed(v_e);
+            md.setM2Speed(-v_e);
+        lastE = e;
         /*#ifdef OUTPUT_READABLE_QUATERNION
             // display quaternion values in easy matrix form: w x y z
             mpu.dmpGetQuaternion(&q, fifoBuffer);
