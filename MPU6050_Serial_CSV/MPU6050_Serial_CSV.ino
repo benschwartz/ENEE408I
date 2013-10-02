@@ -104,7 +104,7 @@ MPU6050 mpu;
 // not compensated for orientation, so +X is always +X according to the
 // sensor, just without the effects of gravity. If you want acceleration
 // compensated for orientation, us OUTPUT_READABLE_WORLDACCEL instead.
-//#define OUTPUT_READABLE_REALACCEL
+#define OUTPUT_READABLE_REALACCEL
 
 // uncomment "OUTPUT_READABLE_WORLDACCEL" if you want to see acceleration
 // components with gravity removed and adjusted for the world frame of
@@ -129,6 +129,10 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 
+double x_dot_measX;
+double x_dot_measZ;
+unsigned long last_millis;
+int calibration_iter;
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
 VectorInt16 aa;         // [x, y, z]            accel sensor measurements
@@ -137,7 +141,8 @@ VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measure
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-
+double offset_measX;
+double offset_measZ;
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
@@ -172,7 +177,8 @@ void setup() {
     // really up to you depending on your project)
     Serial.begin(115200);
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
-
+    x_dot_measX=0;
+    x_dot_measZ=0;
     // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3v or Ardunio
     // Pro Mini running at 3.3v, cannot handle this baud rate reliably due to
     // the baud timing being too misaligned with processor ticks. You must use
@@ -228,6 +234,9 @@ void setup() {
 
     // configure LED for output
     pinMode(LED_PIN, OUTPUT);
+    offset_measX = 0;
+    offset_measZ = 0;
+    calibration_iter = 0;
 }
 
 
@@ -282,13 +291,12 @@ void loop() {
         #ifdef OUTPUT_READABLE_QUATERNION
             // display quaternion values in easy matrix form: w x y z
             mpu.dmpGetQuaternion(&q, fifoBuffer);
-            Serial.print("quat\t");
             Serial.print(q.w);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.print(q.x);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.print(q.y);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.println(q.z);
         #endif
 
@@ -296,11 +304,10 @@ void loop() {
             // display Euler angles in degrees
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetEuler(euler, &q);
-            Serial.print("euler\t");
             Serial.print(euler[0] * 180/M_PI);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.print(euler[1] * 180/M_PI);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.println(euler[2] * 180/M_PI);
         #endif
 
@@ -313,7 +320,8 @@ void loop() {
             Serial.print(",");
             Serial.print(ypr[1] * 180/M_PI);
             Serial.print(",");
-            Serial.println(ypr[2] * 180/M_PI);
+            Serial.print(ypr[2] * 180/M_PI);
+            Serial.print(",");
         #endif
 
         #ifdef OUTPUT_READABLE_REALACCEL
@@ -322,12 +330,12 @@ void loop() {
             mpu.dmpGetAccel(&aa, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-            Serial.print("areal\t");
             Serial.print(aaReal.x);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.print(aaReal.y);
-            Serial.print("\t");
-            Serial.println(aaReal.z);
+            Serial.print(",");
+            Serial.print(aaReal.z);
+            Serial.print(",");
         #endif
 
         #ifdef OUTPUT_READABLE_WORLDACCEL
@@ -338,11 +346,10 @@ void loop() {
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
             mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-            Serial.print("aworld\t");
             Serial.print(aaWorld.x);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.print(aaWorld.y);
-            Serial.print("\t");
+            Serial.print(",");
             Serial.println(aaWorld.z);
         #endif
     
@@ -359,7 +366,36 @@ void loop() {
             Serial.write(teapotPacket, 14);
             teapotPacket[11]++; // packetCount, loops at 0xFF on purpose
         #endif
-
+       
+       double x_double_dot_measX = aaReal.x/cos(ypr[1]);
+       double x_double_dot_measZ = aaReal.z/sin(ypr[1]);
+       unsigned long this_millis = millis();
+       if(this_millis>30000){
+       x_dot_measX += (x_double_dot_measX-offset_measX)*(this_millis-last_millis)*0.001;
+       x_dot_measZ += (x_double_dot_measZ-offset_measZ)*(this_millis-last_millis)*0.001;
+       }
+       else if(this_millis>20000) {
+         // do calibration
+        if(calibration_iter<1000) {
+          offset_measX += x_double_dot_measX;
+          offset_measZ += x_double_dot_measZ;
+          calibration_iter += 1;
+        }
+        else if(calibration_iter==1000) {
+          offset_measX /= 1000;
+          offset_measZ /= 1000;
+          calibration_iter += 1; // never do this again
+        }
+       }
+       Serial.print(x_dot_measX);
+       Serial.print(",");
+       Serial.print(x_dot_measZ);
+       Serial.print(",");
+       Serial.print(x_double_dot_measX);
+       Serial.print(",");
+       Serial.print(x_double_dot_measZ);
+       Serial.print("\n");
+       last_millis=this_millis;
         // blink LED to indicate activity
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
