@@ -1,7 +1,6 @@
 #include "DualMC33926MotorShield.h"
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
-
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
 #endif
@@ -42,14 +41,14 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 double pitch_offset;
-
+unsigned long start;
 
 
 // Control Params
 
-double k = 15.0;
-double kD = 30;
-double kI = 10;
+double k = 15;
+double kD = 2;
+double kI = 7;
 
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
@@ -126,13 +125,13 @@ void setup() {
         Serial.print(devStatus);
         Serial.println(F(")"));
     }
+    start = millis();
+
+        pinMode(LED_PIN, OUTPUT);
+    digitalWrite(led_pin, HIGH);
+    pitch_offset = ypr[1] * 180/M_PI;
 
     // configure LED for output
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(led_pin, HIGH);
-    delay(10000);
-    digitalWrite(led_pin, LOW);
-    pitch_offset = ypr[1] * 180/M_PI;
 }
 
 
@@ -184,10 +183,15 @@ void loop() {
         double yaw = ypr[0] * 180/M_PI;
         double pitch = ypr[1] * 180/M_PI;
         double roll = ypr[2] * 180/M_PI;
+        if(millis()-start<=10000){
+          pitch_offset = ypr[1]*180/M_PI;
+        }
+        else{
+          digitalWrite(LED_PIN,LOW);
         double e = pitch-pitch_offset;
         double eDerv = e - lastE;
         intE += e;
-          double v_e = k*e*abs(e) + kD*eDerv + kI*intE;
+        double v_e = k*e*abs(e) + kD*eDerv + kI*intE;
 
             md.setM1Speed(v_e);
             md.setM2Speed(-v_e);
@@ -276,5 +280,6 @@ void loop() {
         // blink LED to indicate activity
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
+        }
     }
 }
