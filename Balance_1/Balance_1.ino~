@@ -184,16 +184,12 @@ void setup() {
     //###########################################
     // KALMAN FILTER INITIALIZATION
     //###########################################
-    int i,j;
-    for(i=0;i<N;++i) {
+    for(int i=0;i<N;++i) {
       x[i]=0;
-    }
-    for(j=0;j<P;++j) {
-      u[j]=0;
     }
     // multiply K (as in u=-Kx) by -1
     for(i=0;i<P;++i) {
-        for(j=0;j<N;++j) {
+        for(int j=0;j<N;++j) {
             K[i][j] = -1*K[i][j];
         }
     }
