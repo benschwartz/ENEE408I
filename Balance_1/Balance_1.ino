@@ -60,10 +60,10 @@ float K[P][N] = {
   {.7071,1.0995,3.1623,2.2409,-6.6562,-1.3915},
   {.7071,1.0995,-3.1623,-2.2409,-6.6562,-1.3915}
 }; // LQR gain u = -Kx
-float x[N];
-float x_dot[N];
-float u[P];
-float y[M];
+float x[N][1];
+float x_dot[N][1];
+float u[P][1];
+float y[M][1];
 float A[N][N] = {
   {0,1,0,0,0,0},
   {0,0,0,0,5.4365,0},
@@ -210,10 +210,10 @@ void setup() {
     //###########################################
     int i,j;
     for(i=0;i<N;++i) {
-      x[i]=0;
+      x[i][0]=0;
     }
     for(j=0;j<P;++j) {
-      u[j]=0;
+      u[j][0]=0;
     }
     // multiply K (as in u=-Kx) by -1
     for(i=0;i<P;++i) {
@@ -273,18 +273,13 @@ void loop() {
       //######################################################
       // BEGIN MAIN CONTROL PROGRAM
       //######################################################        
-<<<<<<< HEAD
-      md.setM1Speed(-v_e);
-      md.setM2Speed(v_e);
-=======
       // PID
       //double v_e = k*pitch*abs(pitch) + kD*dPitch + kI*intPitch;
-      //md.setM1Speed(v_e);
-      //md.setM2Speed(-v_e);
+      //md.setM1Speed(-v_e);
+      //md.setM2Speed(v_e);
       // LQR
-      md.setM1Speed(u[0]);
-      md.setM2Speed(-u[1]); // minus to correct for motor polarity
->>>>>>> f0dc15cb6e0bc71979c5b358a475426423f8a40a
+      md.setM1Speed(-u[0][0]);
+      md.setM2Speed(u[1][0]); // minus to correct for motor polarity
       //######################################################
       // END MAIN CONTROL PROGRAM
       //######################################################    
@@ -356,12 +351,35 @@ void loop() {
         pitch = pitch_raw-offset_pitch;
         roll = roll_raw-offset_roll;
         double delta_t = (this_millis-last_millis)*.001;
-<<<<<<< HEAD
         dRoll = roll - lastRoll;
         intRoll += dRoll*delta_t;
         intAy += Ay*delta_t;
         lastRoll = roll;
         v_e = k*roll*abs(roll) + kD*dRoll + kI*intRoll;
+        // Kalman filter: update y value
+        y[0][0] = intAy;
+        y[1][0] = roll;
+        y[2][0] = yaw;
+        // then update estimated state
+        Matrix.Multiply((float *)A,(float *)x,N,N,1,(float *)x_dot); // x_dot = Ax
+        float dummy[N], dummy2[M];
+        Matrix.Multiply((float *)B,(float *)u,N,P,1,(float *)dummy); // dummy = Bu
+        Matrix.Add((float *)x_dot,(float *)dummy,N,1,(float *)x_dot); // x_dot = Ax + dummy
+        // x_dot = Ax + Bu
+        Matrix.Multiply((float *)C,(float *)x,M,N,1,(float *)dummy2); // dummy2 = Cx
+        Matrix.Subtract((float *)y,(float *)dummy2,M,1,(float *)dummy2); // dummy2 = y-dummy2 = y-Cx
+        Matrix.Multiply((float *)I,(float *)dummy2,N,M,1,(float *)dummy); // dummy = I*dummy2 = I*(y-Cx)
+        Matrix.Add((float *)x_dot,(float *)dummy,N,1,(float *)x_dot); // x_dot = x_dot + dummy
+        // x_dot = Ax + Bu + I(y-Cx)
+        // integrate x_dot
+        for(int i=0;i<N;++i) {
+            x_dot[i][0] = delta_t*x_dot[i][0];
+        }
+        // update x!
+        Matrix.Add((float *)x,(float *)x_dot,N,1,(float *)x);
+        // and update u
+        // K is set to be the negative of the gain so we don't have to mult by -1
+        Matrix.Multiply((float *)K,(float *)x,P,N,1,(float *)u);
         printState();
       }
     }
@@ -369,39 +387,6 @@ void loop() {
    Serial.println(millis()); 
   }
     last_millis=this_millis;
-=======
-        dPitch = pitch - lastPitch;
-        intPitch += dPitch*delta_t;
-        intAx += Ax*delta_t;
-        lastPitch = pitch;
-        // Kalman filter: update y value
-        y[0] = intAx;
-        y[1] = pitch;
-        y[2] = yaw;
-        // then update estimated state
-        MatrixMult(A,x,N,1,N,x_dot); // x_dot = Ax
-        float dummy[N], dummy2[M];
-        MatrixMult(B,u,N,1,P,dummy); // dummy = Bu
-        MatrixAdd(x_dot,dummy,N,1,x_dot); // x_dot = Ax + dummy
-        // x_dot = Ax + Bu
-        MatrixMult(C,x,M,1,N,dummy2); // dummy2 = Cx
-        MatrixSubtract(y,dummy2,M,1,dummy2); // dummy2 = y-dummy2 = y-Cx
-        MatrixMult(I,dummy2,N,1,M,dummy); // dummy = I*dummy2 = I*(y-Cx)
-        MatrixAdd(x_dot,dummy,N,1,x_dot); // x_dot = x_dot + dummy
-        // x_dot = Ax + Bu + I(y-Cx)
-        // integrate x_dot
-        for(int i=0;i<N;++i) {
-            x_dot[i] = delta_t*x_dot[i];
-        }
-        // update x!
-        MatrixAdd(x,x_dot,N,1,x);
-        // and update u
-        // K is set to be the negative of the gain so we don't have to mult by -1
-        MatrixMult(K,x,P,1,N,u);
-      }
-      last_millis=this_millis;
-    }		
->>>>>>> f0dc15cb6e0bc71979c5b358a475426423f8a40a
     //######################################################
     // END UPDATE MPU STATE
     //######################################################
