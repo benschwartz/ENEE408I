@@ -103,8 +103,8 @@ MPU6050 mpu;
 // components with gravity removed. This acceleration reference frame is
 // not compensated for orientation, so +X is always +X according to the
 // sensor, just without the effects of gravity. If you want acceleration
-// compensated for orientation, us OUTPUT_READABLE_WORLDACCEL instead.
-#define OUTPUT_READABLE_REALACCEL
+// compensated for orientation, us OUTPUT_READABLE_WORLDACCEL instead
+//#define OUTPUT_READABLE_REALACCEL
 
 // uncomment "OUTPUT_READABLE_WORLDACCEL" if you want to see acceleration
 // components with gravity removed and adjusted for the world frame of
@@ -321,7 +321,7 @@ void loop() {
             Serial.print(ypr[1] * 180/M_PI);
             Serial.print(",");
             Serial.print(ypr[2] * 180/M_PI);
-            Serial.print(",");
+            Serial.print("\n");
         #endif
 
         #ifdef OUTPUT_READABLE_REALACCEL
@@ -335,7 +335,7 @@ void loop() {
             Serial.print(aaReal.y);
             Serial.print(",");
             Serial.print(aaReal.z);
-            Serial.print(",");
+            Serial.print("\n");
         #endif
 
         #ifdef OUTPUT_READABLE_WORLDACCEL
@@ -387,14 +387,14 @@ void loop() {
           calibration_iter += 1; // never do this again
         }
        }
-       Serial.print(x_dot_measX);
-       Serial.print(",");
-       Serial.print(x_dot_measZ);
-       Serial.print(",");
-       Serial.print(x_double_dot_measX);
-       Serial.print(",");
-       Serial.print(x_double_dot_measZ);
-       Serial.print("\n");
+      // Serial.print(x_dot_measX);
+      // Serial.print(",");
+      // Serial.print(x_dot_measZ);
+      // Serial.print(",");
+      // Serial.print(x_double_dot_measX);
+      // Serial.print(",");
+      // Serial.print(x_double_dot_measZ);
+      // Serial.print("\n");
        last_millis=this_millis;
         // blink LED to indicate activity
         blinkState = !blinkState;

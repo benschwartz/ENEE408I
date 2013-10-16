@@ -105,11 +105,11 @@ double roll;
 double Ax;
 double Ay;
 double Az;
-double lastPitch;
-double intPitch;
-double dPitch;
-double intAx;
-
+double lastRoll;
+double intRoll;
+double dRoll;
+double intAy;
+double v_e;
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
 // ================================================================
@@ -119,6 +119,28 @@ void dmpDataReady() {
     mpuInterrupt = true;
 }
 
+
+void printState(){
+ Serial.print(Ax);
+ Serial.print(",");
+ Serial.print(Ay);
+ Serial.print(",");
+ Serial.print(Az);
+ Serial.print(",");
+ Serial.print(yaw);
+ Serial.print(",");
+ Serial.print(pitch);
+ Serial.print(",");
+ Serial.print(roll);
+ Serial.print(",");
+ Serial.print(dRoll);
+ Serial.print(",");
+ Serial.print(intRoll);
+ Serial.print(",");
+ Serial.print(intAy);
+ Serial.print("\n"); 
+}
+
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
@@ -126,6 +148,7 @@ void dmpDataReady() {
 void setup() {
     Serial.begin(115200);
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
+    Serial.println("Printing to Serial!");
     //###########################################
     // PINS
     //###########################################
@@ -152,6 +175,7 @@ void setup() {
     md.init();
     mpu.initialize();
     devStatus = mpu.dmpInitialize();
+    Serial.println("MPU Initialized done.");
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
     // turn on the DMP, now that it's ready
@@ -208,14 +232,15 @@ void setup() {
     yaw = 0;
     pitch = 0;
     roll = 0;
-    intAx = 0;
-    lastPitch = 0;
-    intPitch = 0;
-    dPitch = 0;
+    intAy = 0;
+    lastRoll = 0;
+    intRoll = 0;
+    dRoll = 0;
+    v_e = 0;
     //###########################################
     // END STATE INITIALIZATION
     //###########################################
-    
+    Serial.println("Setup done.");
 }
 
 // ================================================================
@@ -223,16 +248,18 @@ void setup() {
 // ================================================================
 
 void loop() {
-  if (!dmpReady) return; // if programming failed, don't try to do anything
+  if (!dmpReady){
+    Serial.println("Programming failed...");
+    return; // if programming failed, don't try to do anything
+  }
   // wait for MPU interrupt or extra packet(s) available
   while (!mpuInterrupt && fifoCount < packetSize) { 
-    if(calibration_iter > CAL_ITERS){ // check if calibration has finished
+       if(calibration_iter > CAL_ITERS){ // check if calibration has finished
       //######################################################
       // BEGIN MAIN CONTROL PROGRAM
       //######################################################        
-      double v_e = k*pitch*abs(pitch) + kD*dPitch + kI*intPitch;
-      md.setM1Speed(v_e);
-      md.setM2Speed(-v_e);
+      md.setM1Speed(-v_e);
+      md.setM2Speed(v_e);
       //######################################################
       // END MAIN CONTROL PROGRAM
       //######################################################    
@@ -283,6 +310,7 @@ void loop() {
         offset_pitch += pitch_raw;
         offset_roll += roll_raw;
         calibration_iter += 1;  
+        Serial.println(calibration_iter);
       }
       else if(calibration_iter == CAL_ITERS){ // Calibration finished
         offset_Ax /= CAL_ITERS;
@@ -292,6 +320,7 @@ void loop() {
         offset_pitch /= CAL_ITERS;
         offset_roll /= CAL_ITERS;
         calibration_iter += 1; // never do this again
+        Serial.println(calibration_iter);
         digitalWrite(CALIB_LED_PIN,LOW);
       }
       else {  // Post calibration - update state to account for offsets and integrate x
@@ -302,17 +331,23 @@ void loop() {
         pitch = pitch_raw-offset_pitch;
         roll = roll_raw-offset_roll;
         double delta_t = (this_millis-last_millis)*.001;
-        dPitch = pitch - lastPitch;
-        intPitch += dPitch*delta_t;
-        intAx += Ax*delta_t;
-        lastPitch = pitch;
+        dRoll = roll - lastRoll;
+        intRoll += dRoll*delta_t;
+        intAy += Ay*delta_t;
+        lastRoll = roll;
+        v_e = k*roll*abs(roll) + kD*dRoll + kI*intRoll;
+        printState();
       }
-      last_millis=this_millis;
     }
+    else{
+   Serial.println(millis()); 
+  }
+    last_millis=this_millis;
     //######################################################
     // END UPDATE MPU STATE
     //######################################################
   }
+  
   //########################################################
   // END MPU INTERRUPT ROUTINE
   //########################################################  
