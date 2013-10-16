@@ -48,7 +48,7 @@ float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 ///////////////////////////////////////////////////
 //KALMAN FILTERING
-float Innovation[N][M] = {
+float I[N][M] = {
   {.0774,.0876,0},
   {0,0,.9967},
   {.9938,-.0068,0},
@@ -79,6 +79,11 @@ float B[N][P] = {
   {146.7373,-146.7373},
   {0,0},
   {-57.6542,-57.6542}
+};
+float C[M][N] = { // 6 columns, 3 rows: y=[x_dot theta psi]
+    {0,1,0,0,0,0},
+    {0,0,1,0,0,0},
+    {0,0,0,0,1,0}
 };
 ///////////////////////////////////////////////////
 //CALIBRATION
@@ -203,8 +208,18 @@ void setup() {
     //###########################################
     // KALMAN FILTER INITIALIZATION
     //###########################################
-    for(int i=0;i<N;++i) {
+    int i,j;
+    for(i=0;i<N;++i) {
       x[i]=0;
+    }
+    for(j=0;j<P;++j) {
+      u[j]=0;
+    }
+    // multiply K (as in u=-Kx) by -1
+    for(i=0;i<P;++i) {
+        for(j=0;j<N;++j) {
+            K[i][j] = -1*K[i][j];
+        }
     }
     //###########################################
     // END KALMAN FILTER INITIALIZATION
@@ -258,8 +273,18 @@ void loop() {
       //######################################################
       // BEGIN MAIN CONTROL PROGRAM
       //######################################################        
+<<<<<<< HEAD
       md.setM1Speed(-v_e);
       md.setM2Speed(v_e);
+=======
+      // PID
+      //double v_e = k*pitch*abs(pitch) + kD*dPitch + kI*intPitch;
+      //md.setM1Speed(v_e);
+      //md.setM2Speed(-v_e);
+      // LQR
+      md.setM1Speed(u[0]);
+      md.setM2Speed(-u[1]); // minus to correct for motor polarity
+>>>>>>> f0dc15cb6e0bc71979c5b358a475426423f8a40a
       //######################################################
       // END MAIN CONTROL PROGRAM
       //######################################################    
@@ -331,6 +356,7 @@ void loop() {
         pitch = pitch_raw-offset_pitch;
         roll = roll_raw-offset_roll;
         double delta_t = (this_millis-last_millis)*.001;
+<<<<<<< HEAD
         dRoll = roll - lastRoll;
         intRoll += dRoll*delta_t;
         intAy += Ay*delta_t;
@@ -343,6 +369,39 @@ void loop() {
    Serial.println(millis()); 
   }
     last_millis=this_millis;
+=======
+        dPitch = pitch - lastPitch;
+        intPitch += dPitch*delta_t;
+        intAx += Ax*delta_t;
+        lastPitch = pitch;
+        // Kalman filter: update y value
+        y[0] = intAx;
+        y[1] = pitch;
+        y[2] = yaw;
+        // then update estimated state
+        MatrixMult(A,x,N,1,N,x_dot); // x_dot = Ax
+        float dummy[N], dummy2[M];
+        MatrixMult(B,u,N,1,P,dummy); // dummy = Bu
+        MatrixAdd(x_dot,dummy,N,1,x_dot); // x_dot = Ax + dummy
+        // x_dot = Ax + Bu
+        MatrixMult(C,x,M,1,N,dummy2); // dummy2 = Cx
+        MatrixSubtract(y,dummy2,M,1,dummy2); // dummy2 = y-dummy2 = y-Cx
+        MatrixMult(I,dummy2,N,1,M,dummy); // dummy = I*dummy2 = I*(y-Cx)
+        MatrixAdd(x_dot,dummy,N,1,x_dot); // x_dot = x_dot + dummy
+        // x_dot = Ax + Bu + I(y-Cx)
+        // integrate x_dot
+        for(int i=0;i<N;++i) {
+            x_dot[i] = delta_t*x_dot[i];
+        }
+        // update x!
+        MatrixAdd(x,x_dot,N,1,x);
+        // and update u
+        // K is set to be the negative of the gain so we don't have to mult by -1
+        MatrixMult(K,x,P,1,N,u);
+      }
+      last_millis=this_millis;
+    }		
+>>>>>>> f0dc15cb6e0bc71979c5b358a475426423f8a40a
     //######################################################
     // END UPDATE MPU STATE
     //######################################################
