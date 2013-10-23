@@ -47,45 +47,6 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 ///////////////////////////////////////////////////
-//KALMAN FILTERING
-float I[N][M] = {
-  {.0774,.0876,0},
-  {0,0,.9967},
-  {.9938,-.0068,0},
-  {0,0,7.9460},
-  {-.0068,.9919,0},
-  {0,0,4.195}
-}; // Innovation gain (Kalman filter)
-float K[P][N] = {
-  {.7071,1.0995,3.1623,2.2409,-6.6562,-1.3915},
-  {.7071,1.0995,-3.1623,-2.2409,-6.6562,-1.3915}
-}; // LQR gain u = -Kx
-float x[N][1];
-float x_dot[N][1];
-float u[P][1];
-float y[M][1];
-float A[N][N] = {
-  {0,1,0,0,0,0},
-  {0,0,0,0,5.4365,0},
-  {0,0,0,1,0,0},
-  {0,0,0,0,0,0},
-  {0,0,0,0,0,1},
-  {0,0,0,0,61.1608,0}
-};
-float B[N][P] = {
-  {0,0},
-  {-16.6455,-16.6455},
-  {0,0},
-  {146.7373,-146.7373},
-  {0,0},
-  {-57.6542,-57.6542}
-};
-float C[M][N] = { // 6 columns, 3 rows: y=[x_dot theta psi]
-    {0,1,0,0,0,0},
-    {0,0,1,0,0,0},
-    {0,0,0,0,1,0}
-};
-///////////////////////////////////////////////////
 //CALIBRATION
 int calibration_iter;
 double offset_Ax;
@@ -99,9 +60,9 @@ double offset_roll;
 unsigned long last_millis;
 /////////////////////////////////////////////////////
 // Control Params
-double k = 15;
-double kD = 2;
-double kI = 7;
+double k = 30;
+double kD = 16;
+double kI = 8;
 /////////////////////////////////////////////////////
 // State Vars
 double yaw;
@@ -126,6 +87,7 @@ void dmpDataReady() {
 
 
 void printState(){
+ //Fields 1-6
  Serial.print(Ax);
  Serial.print(",");
  Serial.print(Ay);
@@ -138,11 +100,6 @@ void printState(){
  Serial.print(",");
  Serial.print(roll);
  Serial.print(",");
- Serial.print(dRoll);
- Serial.print(",");
- Serial.print(intRoll);
- Serial.print(",");
- Serial.print(intAy);
  Serial.print("\n"); 
 }
 
@@ -206,25 +163,6 @@ void setup() {
     // END MOTOR SHIELD
     //###########################################
     //###########################################
-    // KALMAN FILTER INITIALIZATION
-    //###########################################
-    int i,j;
-    for(i=0;i<N;++i) {
-      x[i][0]=0;
-    }
-    for(j=0;j<P;++j) {
-      u[j][0]=0;
-    }
-    // multiply K (as in u=-Kx) by -1
-    for(i=0;i<P;++i) {
-        for(j=0;j<N;++j) {
-            K[i][j] = -1*K[i][j];
-        }
-    }
-    //###########################################
-    // END KALMAN FILTER INITIALIZATION
-    //###########################################
-    //###########################################
     // CALIBRATION INITIALIZATION
     //###########################################
     offset_Ax = 0;
@@ -274,12 +212,8 @@ void loop() {
       // BEGIN MAIN CONTROL PROGRAM
       //######################################################        
       // PID
-      //double v_e = k*pitch*abs(pitch) + kD*dPitch + kI*intPitch;
-      //md.setM1Speed(-v_e);
-      //md.setM2Speed(v_e);
-      // LQR
-      md.setM1Speed(-u[0][0]);
-      md.setM2Speed(u[1][0]); // minus to correct for motor polarity
+      md.setM1Speed(-v_e);
+      md.setM2Speed(v_e);
       //######################################################
       // END MAIN CONTROL PROGRAM
       //######################################################    
@@ -356,30 +290,6 @@ void loop() {
         intAy += Ay*delta_t;
         lastRoll = roll;
         v_e = k*roll*abs(roll) + kD*dRoll + kI*intRoll;
-        // Kalman filter: update y value
-        y[0][0] = intAy;
-        y[1][0] = roll;
-        y[2][0] = yaw;
-        // then update estimated state
-        Matrix.Multiply((float *)A,(float *)x,N,N,1,(float *)x_dot); // x_dot = Ax
-        float dummy[N], dummy2[M];
-        Matrix.Multiply((float *)B,(float *)u,N,P,1,(float *)dummy); // dummy = Bu
-        Matrix.Add((float *)x_dot,(float *)dummy,N,1,(float *)x_dot); // x_dot = Ax + dummy
-        // x_dot = Ax + Bu
-        Matrix.Multiply((float *)C,(float *)x,M,N,1,(float *)dummy2); // dummy2 = Cx
-        Matrix.Subtract((float *)y,(float *)dummy2,M,1,(float *)dummy2); // dummy2 = y-dummy2 = y-Cx
-        Matrix.Multiply((float *)I,(float *)dummy2,N,M,1,(float *)dummy); // dummy = I*dummy2 = I*(y-Cx)
-        Matrix.Add((float *)x_dot,(float *)dummy,N,1,(float *)x_dot); // x_dot = x_dot + dummy
-        // x_dot = Ax + Bu + I(y-Cx)
-        // integrate x_dot
-        for(int i=0;i<N;++i) {
-            x_dot[i][0] = delta_t*x_dot[i][0];
-        }
-        // update x!
-        Matrix.Add((float *)x,(float *)x_dot,N,1,(float *)x);
-        // and update u
-        // K is set to be the negative of the gain so we don't have to mult by -1
-        Matrix.Multiply((float *)K,(float *)x,P,N,1,(float *)u);
         printState();
       }
     }
