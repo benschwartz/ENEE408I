@@ -7,7 +7,7 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-    #include "Wire.h"
+#include "Wire.h"
 #endif
 //KALMAN FILTERING
 #include "MatrixMath.h"
@@ -82,25 +82,25 @@ double v_e;
 
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
 void dmpDataReady() {
-    mpuInterrupt = true;
+  mpuInterrupt = true;
 }
 
 
 void printState(){
- //Fields 1-6
- Serial.print(Ax);
- Serial.print(",");
- Serial.print(Ay);
- Serial.print(",");
- Serial.print(Az);
- Serial.print(",");
- Serial.print(yaw);
- Serial.print(",");
- Serial.print(pitch);
- Serial.print(",");
- Serial.print(roll);
- Serial.print(",");
- Serial.print("\n"); 
+  //Fields 1-6
+  Serial.print(Ax);
+  Serial.print(",");
+  Serial.print(Ay);
+  Serial.print(",");
+  Serial.print(Az);
+  Serial.print(",");
+  Serial.print(yaw);
+  Serial.print(",");
+  Serial.print(pitch);
+  Serial.print(",");
+  Serial.print(roll);
+  Serial.print(",");
+  Serial.print("\n"); 
 }
 
 // ================================================================
@@ -108,92 +108,93 @@ void printState(){
 // ================================================================
 
 void setup() {
-    Serial.begin(115200);
-    while (!Serial); // wait for Leonardo enumeration, others continue immediately
-    Serial.println("Printing to Serial!");
-    //###########################################
-    // PINS
-    //###########################################
-    pinMode(CALIB_LED_PIN, OUTPUT);
-    //###########################################
-    // END PINS
-    //###########################################
-    //###########################################
-    // IMU
-    //###########################################
-    // join I2C bus (I2Cdev library doesn't do this automatically)
-    #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-        Wire.begin();
-        TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz)
-    #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
-        Fastwire::setup(400, true);
-    #endif
-    //###########################################
-    // END IMU
-    //###########################################
-    //###########################################
-    // MOTOR SHIELD
-    //###########################################
-    md.init();
-    mpu.initialize();
-    devStatus = mpu.dmpInitialize();
-    Serial.println("MPU Initialized done.");
-    // make sure it worked (returns 0 if so)
-    if (devStatus == 0) {
+  Serial.begin(115200);
+  while (!Serial); // wait for Leonardo enumeration, others continue immediately
+  Serial.println("Printing to Serial!");
+  //###########################################
+  // PINS
+  //###########################################
+  pinMode(CALIB_LED_PIN, OUTPUT);
+  //###########################################
+  // END PINS
+  //###########################################
+  //###########################################
+  // IMU
+  //###########################################
+  // join I2C bus (I2Cdev library doesn't do this automatically)
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+  Wire.begin();
+  TWBR = 24; // 400kHz I2C clock (200kHz if CPU is 8MHz)
+#elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+  Fastwire::setup(400, true);
+#endif
+  //###########################################
+  // END IMU
+  //###########################################
+  //###########################################
+  // MOTOR SHIELD
+  //###########################################
+  md.init();
+  mpu.initialize();
+  devStatus = mpu.dmpInitialize();
+  Serial.println("MPU Initialized done.");
+  // make sure it worked (returns 0 if so)
+  if (devStatus == 0) {
     // turn on the DMP, now that it's ready
-      mpu.setDMPEnabled(true);
-      // enable Arduino interrupt detection
-      // Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-      attachInterrupt(0, dmpDataReady, RISING);
-      mpuIntStatus = mpu.getIntStatus();
-      // set our DMP Ready flag so the main loop() function knows it's okay to use it
-      dmpReady = true;
-      // get expected DMP packet size for later comparison
-      packetSize = mpu.dmpGetFIFOPacketSize();
-    } else {
-        // ERROR!
-        // 1 = initial memory load failed
-        // 2 = DMP configuration updates failed
-        // (if it's going to break, usually the code will be 1)
-        Serial.print(F("DMP Initialization failed (code "));
-        Serial.print(devStatus);
-        Serial.println(F(")"));
-    }
-    //###########################################
-    // END MOTOR SHIELD
-    //###########################################
-    //###########################################
-    // CALIBRATION INITIALIZATION
-    //###########################################
-    offset_Ax = 0;
-    offset_Ay = 0;
-    offset_Az = 0;
-    offset_yaw = 0;
-    offset_pitch = 0;
-    offset_roll = 0;
-    calibration_iter = 0;
-    digitalWrite(CALIB_LED_PIN, HIGH);
-    //###########################################
-    // END CALIBRATION INITIALIZATION
-    //###########################################
-    //###########################################
-    // STATE INITIALIZATION
-    //###########################################
-    Ax = 0;
-    Ay = 0;
-    Az = 0;
-    yaw = 0;
-    pitch = 0;
-    roll = 0;
-    intAy = 0;
-    lastRoll = 0;
-    intRoll = 0;
-    dRoll = 0;
-    v_e = 0;
-    //###########################################
-    // END STATE INITIALIZATION
-    //###########################################
-    Serial.println("Setup done.");
+    mpu.setDMPEnabled(true);
+    // enable Arduino interrupt detection
+    // Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
+    attachInterrupt(0, dmpDataReady, RISING);
+    mpuIntStatus = mpu.getIntStatus();
+    // set our DMP Ready flag so the main loop() function knows it's okay to use it
+    dmpReady = true;
+    // get expected DMP packet size for later comparison
+    packetSize = mpu.dmpGetFIFOPacketSize();
+  } 
+  else {
+    // ERROR!
+    // 1 = initial memory load failed
+    // 2 = DMP configuration updates failed
+    // (if it's going to break, usually the code will be 1)
+    Serial.print(F("DMP Initialization failed (code "));
+    Serial.print(devStatus);
+    Serial.println(F(")"));
+  }
+  //###########################################
+  // END MOTOR SHIELD
+  //###########################################
+  //###########################################
+  // CALIBRATION INITIALIZATION
+  //###########################################
+  offset_Ax = 0;
+  offset_Ay = 0;
+  offset_Az = 0;
+  offset_yaw = 0;
+  offset_pitch = 0;
+  offset_roll = 0;
+  calibration_iter = 0;
+  digitalWrite(CALIB_LED_PIN, HIGH);
+  //###########################################
+  // END CALIBRATION INITIALIZATION
+  //###########################################
+  //###########################################
+  // STATE INITIALIZATION
+  //###########################################
+  Ax = 0;
+  Ay = 0;
+  Az = 0;
+  yaw = 0;
+  pitch = 0;
+  roll = 0;
+  intAy = 0;
+  lastRoll = 0;
+  intRoll = 0;
+  dRoll = 0;
+  v_e = 0;
+  //###########################################
+  // END STATE INITIALIZATION
+  //###########################################
+  Serial.println("Setup done.");
 }
 
 // ================================================================
@@ -207,7 +208,7 @@ void loop() {
   }
   // wait for MPU interrupt or extra packet(s) available
   while (!mpuInterrupt && fifoCount < packetSize) { 
-       if(calibration_iter > CAL_ITERS){ // check if calibration has finished
+    if(calibration_iter > CAL_ITERS){ // check if calibration has finished
       //######################################################
       // BEGIN MAIN CONTROL PROGRAM
       //######################################################        
@@ -230,9 +231,10 @@ void loop() {
     mpu.resetFIFO(); // reset so we can continue cleanly
     Serial.println(F("FIFO overflow!"));
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
-  } else if (mpuIntStatus & 0x02) {
+  } 
+  else if (mpuIntStatus & 0x02) {
     // wait for correct available data length, should be a VERY short wait
-  while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
+    while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
     mpu.getFIFOBytes(fifoBuffer, packetSize); // read a packet from FIFO
     // track FIFO count here in case there is > 1 packet available
     // (this lets us immediately read more without waiting for an interrupt)
@@ -294,15 +296,16 @@ void loop() {
       }
     }
     else{
-   Serial.println(millis()); 
-  }
+      Serial.println(millis()); 
+    }
     last_millis=this_millis;
     //######################################################
     // END UPDATE MPU STATE
     //######################################################
   }
-  
+
   //########################################################
   // END MPU INTERRUPT ROUTINE
   //########################################################  
 }
+
