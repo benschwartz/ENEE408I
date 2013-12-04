@@ -1,3 +1,6 @@
+#include <DualMC33926MotorShield.h>
+DualMC33926MotorShield md; // Motorshield Object
+
 /* Copyright (C) 2012 Kristian Lauszus, TKJ Electronics. All rights reserved.
  
  This software may be distributed and modified under the terms of the GNU
@@ -35,12 +38,21 @@ double kalAngleX, kalAngleY; // Calculate the angle using a Kalman filter
 uint32_t timer;
 uint8_t i2cData[14]; // Buffer for I2C data
 
+float kp=20;
+float ki=0.01;
+float kd=6;
+
 int loops;
 double offset;
+
+float integral;
+float derivative;
+float last;
 
 void setup() {  
   Serial.begin(115200);
   Wire.begin();
+  md.init();
   i2cData[0] = 7; // Set the sample rate to 1000Hz - 8kHz/(7+1) = 1000Hz
   i2cData[1] = 0x00; // Disable FSYNC and set 260 Hz Acc filtering, 256 Hz Gyro filtering, 8 KHz sampling
   i2cData[2] = 0x00; // Set Gyro Full Scale Range to ±250deg/s
@@ -76,6 +88,9 @@ void setup() {
   loops = 0;
   
   timer = micros();
+  integral=0;
+  derivative=0;
+  last=0;
   
 }
 
@@ -108,7 +123,6 @@ void loop() {
   
   kalAngleX = kalmanX.getAngle(accXangle, gyroXrate, (double)(micros()-timer)/1000000); // Calculate the angle using a Kalman filter
   kalAngleY = kalmanY.getAngle(accYangle, gyroYrate, (double)(micros()-timer)/1000000);
-  timer = micros();
   
   temp = ((double)tempRaw + 12412.0) / 340.0;
   
@@ -141,7 +155,14 @@ void loop() {
   if(loops == 100){
    offset = kalAngleX; 
   }
-  int ang = kalAngleX - offset;
+  float ang = compAngleX - offset;
+  derivative=(ang-last)/(micros()-timer);
+  integral=integral+(micros()-timer)*ang;
+  float v1 = kp*ang + ki*integral + kd*derivative;
+  float v2 = -v1;
+  md.setM1Speed(v1);
+  md.setM2Speed(v2);
+  
   Serial.print(ang);
   Serial.print("\t");
   Serial.print(offset);
@@ -151,4 +172,8 @@ void loop() {
   Serial.print(gyroXangle);
   Serial.print("\n");
   delay(10);
+  last=ang;
+  timer = micros();
+  
+  
 }
